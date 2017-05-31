@@ -40,8 +40,10 @@
 #include <wx/webviewfshandler.h>
 
 #include <memory>
+#include <regex>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #if defined( __WXMSW__ ) || defined( __WXOSX__ )
 #include "images/refresh.xpm"
@@ -54,9 +56,15 @@
 // We map menu items to their history items
 WX_DECLARE_HASH_MAP( int, wxSharedPtr<wxWebViewHistoryItem>, wxIntegerHash, wxIntegerEqual, wxMenuHistoryMap );
 
+struct url_validation_t {
+	bool is_regex;
+	std::string url;
+}; // url_validation_t
+
 struct config_t {
 	std::string home_url;
 	std::string app_title;
+	std::vector<url_validation_t> url_validators;
 	bool enable_clipboard;
 	bool enable_command_line;
 	bool enable_edit;
@@ -65,12 +73,15 @@ struct config_t {
 	bool enable_reload;
 	bool enable_search;
 	bool enable_select;
+	bool enable_toolbar;
 	bool enable_view_source;
 	bool enable_view_text;
 	bool enable_zoom;
 
 	bool is_valid_url( wxString const &url ) const {
-		return true;
+		if( url_validators.empty( ) ) {
+			return true;
+		}
 	}
 };
 
@@ -85,6 +96,7 @@ struct config_denied_exception : public std::runtime_error {
 			enable_reload,
 			enable_search,
 			enable_select,
+			enable_toolbar,
 			enable_view_source,
 			enable_view_text,
 			enable_zoom,
@@ -99,6 +111,7 @@ struct config_denied_exception : public std::runtime_error {
 			    "Access denied, enable_reload feature is not enabled",
 			    "Access denied, enable_search feature is not enabled",
 			    "Access denied, enable_select feature is not enabled",
+			    "Access denied, enable_toolbar feature is not enabled",
 			    "Access denied, enable_view_source feature is not enabled",
 			    "Access denied, enable_view_text feature is not enabled",
 			    "Access denied, enable_zoom feature is not enabled",
@@ -119,7 +132,7 @@ struct config_denied_exception : public std::runtime_error {
 	config_denied_exception &operator=( config_denied_exception const & ) = default;
 	config_denied_exception &operator=( config_denied_exception && ) = default;
 
-	config_denied_exception( config_param_t::type ex_type )
+	explicit config_denied_exception( config_param_t::type ex_type )
 	    : std::runtime_error{config_param_t::to_string( ex_type )} {}
 
 }; // config_denied_exception
@@ -282,11 +295,11 @@ class WebFrame : public wxFrame {
 	void OnFind( wxCommandEvent &evt );
 	void OnFindDone( wxCommandEvent &evt );
 	void OnFindText( wxCommandEvent &evt );
-	void OnFindOptions( wxCommandEvent &evt );
+	// void OnFindOptions( wxCommandEvent &evt );
 	void OnEnableContextMenu( wxCommandEvent &evt );
 }; // WebFrame
 
-struct SourceViewDialog : public wxDialog {
+struct SourceViewDialog : wxDialog {
 	SourceViewDialog( wxWindow *parent, wxString source );
 	virtual ~SourceViewDialog( ) = default;
 	SourceViewDialog( SourceViewDialog const & ) = default;
@@ -324,7 +337,7 @@ bool WebApp::OnInit( ) {
 	                                         "<p><a href='memory:page1.htm'>Page 1</a> was better.</p></body>" );
 	wxMemoryFSHandler::AddFile( "test.css", "h1 {color: red;}" );
 
-	m_frame = new WebFrame{"http://www.google.ca", m_app_config};
+	m_frame = new WebFrame{"https://www.youtube.com", m_app_config};
 	m_frame->Show( );
 
 	return true;
@@ -341,25 +354,25 @@ WebFrame::WebFrame( wxString const &url, config_t const &app_config )
 
 	// set the frame icon
 	SetIcon( wxICON( sample ) );
-	SetTitle( m_app_config->app_title.c_str( ) );
+	wxFrame::SetTitle( m_app_config->app_title.c_str( ) );
 
 	auto topsizer = std::make_unique<wxBoxSizer>( wxVERTICAL );
 
 	// Create the toolbar
-	m_toolbar = CreateToolBar( wxTB_TEXT );
+	m_toolbar = wxFrame::CreateToolBar( wxTB_TEXT );
 	m_toolbar->SetToolBitmapSize( wxSize{32, 32} );
 
-	wxBitmap back = wxArtProvider::GetBitmap( wxART_GO_BACK, wxART_TOOLBAR );
-	wxBitmap forward = wxArtProvider::GetBitmap( wxART_GO_FORWARD, wxART_TOOLBAR );
+	auto back = wxArtProvider::GetBitmap( wxART_GO_BACK, wxART_TOOLBAR );
+	auto forward = wxArtProvider::GetBitmap( wxART_GO_FORWARD, wxART_TOOLBAR );
 #ifdef __WXGTK__
-	wxBitmap stop = wxArtProvider::GetBitmap( "gtk-stop", wxART_TOOLBAR );
+	auto stop = wxArtProvider::GetBitmap( "gtk-stop", wxART_TOOLBAR );
 #else
-	wxBitmap stop = wxBitmap( stop_xpm );
+	auto stop = wxBitmap( stop_xpm );
 #endif
 #ifdef __WXGTK__
-	wxBitmap refresh = wxArtProvider::GetBitmap( "gtk-refresh", wxART_TOOLBAR );
+	auto refresh = wxArtProvider::GetBitmap( "gtk-refresh", wxART_TOOLBAR );
 #else
-	wxBitmap refresh = wxBitmap( refresh_xpm );
+	auto refresh = wxBitmap( refresh_xpm );
 #endif
 
 	m_toolbar_back = m_toolbar->AddTool( wxID_ANY, _( "Back" ), back );
@@ -424,6 +437,7 @@ WebFrame::WebFrame( wxString const &url, config_t const &app_config )
 
 	// Create the webview
 	m_browser = wxWebView::New( this, wxID_ANY, url );
+
 	topsizer->Add( m_browser, wxSizerFlags( ).Expand( ).Proportion( 1 ) );
 
 	// We register the wxfs:// protocol for testing purposes
@@ -482,25 +496,25 @@ WebFrame::WebFrame( wxString const &url, config_t const &app_config )
 	m_tools_menu->AppendSeparator( );
 	m_tools_menu->AppendSubMenu( editmenu, "Edit" );
 
-	wxMenu *scroll_menu = new wxMenu{};
+	auto scroll_menu = std::make_unique<wxMenu>( );
 	m_scroll_line_up = scroll_menu->Append( wxID_ANY, "Line &up" );
 	m_scroll_line_down = scroll_menu->Append( wxID_ANY, "Line &down" );
 	m_scroll_page_up = scroll_menu->Append( wxID_ANY, "Page u&p" );
 	m_scroll_page_down = scroll_menu->Append( wxID_ANY, "Page d&own" );
-	m_tools_menu->AppendSubMenu( scroll_menu, "Scroll" );
+	m_tools_menu->AppendSubMenu( scroll_menu.release( ), "Scroll" );
 
-	wxMenuItem *script = m_tools_menu->Append( wxID_ANY, _( "Run Script" ) );
+	auto *script = m_tools_menu->Append( wxID_ANY, _( "Run Script" ) );
 
 	// Selection menu
-	wxMenu *selection = new wxMenu{};
+	auto selection = std::make_unique<wxMenu>( );
 	m_selection_clear = selection->Append( wxID_ANY, _( "Clear Selection" ) );
 	m_selection_delete = selection->Append( wxID_ANY, _( "Delete Selection" ) );
-	wxMenuItem *selectall = selection->Append( wxID_ANY, _( "Select All" ) );
+	auto *selectall = selection->Append( wxID_ANY, _( "Select All" ) );
 
-	editmenu->AppendSubMenu( selection, "Selection" );
+	editmenu->AppendSubMenu( selection.release( ), "Selection" );
 
-	wxMenuItem *loadscheme = m_tools_menu->Append( wxID_ANY, _( "Custom Scheme Example" ) );
-	wxMenuItem *usememoryfs = m_tools_menu->Append( wxID_ANY, _( "Memory File System Example" ) );
+	auto *loadscheme = m_tools_menu->Append( wxID_ANY, _( "Custom Scheme Example" ) );
+	auto *usememoryfs = m_tools_menu->Append( wxID_ANY, _( "Memory File System Example" ) );
 
 	m_context_menu = m_tools_menu->AppendCheckItem( wxID_ANY, _( "Enable Context Menu" ) );
 
@@ -818,7 +832,7 @@ void WebFrame::OnFindText( wxCommandEvent &evt ) {
  * when the user clicks a link)
  */
 void WebFrame::OnNavigationRequest( wxWebViewEvent &evt ) {
-	if( !m_app_config->enable_navigation ) {
+	if( false && !m_app_config->enable_navigation ) {
 		evt.Veto( );
 		m_toolbar->EnableTool( m_toolbar_stop->GetId( ), false );
 		return;
@@ -1079,6 +1093,8 @@ void WebFrame::OnError( wxWebViewEvent &evt ) {
 		WX_ERROR_CASE( wxWEBVIEW_NAV_ERR_REQUEST );
 		WX_ERROR_CASE( wxWEBVIEW_NAV_ERR_USER_CANCELLED );
 		WX_ERROR_CASE( wxWEBVIEW_NAV_ERR_OTHER );
+	default:
+		throw std::logic_error( "Unknown event type in OnError" );
 	}
 
 	wxLogMessage( "%s", "Error; url='" + evt.GetURL( ) + "', error='" + category + " (" + evt.GetString( ) + ")'" );
