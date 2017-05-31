@@ -3,14 +3,14 @@
 // Copyright (c) 2017 Darrell Wright
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files( the "Software" ), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and / or sell
-// copies of the Software, and to permit persons to whom the Software is
+// of this software and associated documentation files( the "Software" ), to
+// deal in the Software without restriction, including without limitation the
+// rights to use, copy, modify, merge, publish, distribute, sublicense, and / or
+// sell copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
 //
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
 //
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -43,26 +43,67 @@
 #include <stdexcept>
 #include <string>
 
+#if defined( __WXMSW__ ) || defined( __WXOSX__ )
+#include "images/refresh.xpm"
+#include "images/stop.xpm"
+#endif
+
+#include "images/sample.xpm"
+#include "images/wxlogo.xpm"
+
 // We map menu items to their history items
 WX_DECLARE_HASH_MAP( int, wxSharedPtr<wxWebViewHistoryItem>, wxIntegerHash, wxIntegerEqual, wxMenuHistoryMap );
 
 struct config_t {
 	std::string home_url;
+	std::string app_title;
+	bool enable_clipboard;
 	bool enable_command_line;
+	bool enable_edit;
+	bool enable_navigation;
 	bool enable_printing;
+	bool enable_reload;
+	bool enable_search;
+	bool enable_select;
+	bool enable_view_source;
+	bool enable_view_text;
+	bool enable_zoom;
 
-	bool is_valid_url( wxString const & url ) const {
+	bool is_valid_url( wxString const &url ) const {
 		return true;
 	}
 };
 
 struct config_denied_exception : public std::runtime_error {
 	struct config_param_t final {
-		enum class type : uint8_t { enable_command_line };
-		static constexpr auto to_string( type t ) noexcept {
-			return ( char const *[] ){
+		enum class type : uint8_t {
+			enable_clipboard,
+			enable_command_line,
+			enable_edit,
+			enable_navigation,
+			enable_printing,
+			enable_reload,
+			enable_search,
+			enable_select,
+			enable_view_source,
+			enable_view_text,
+			enable_zoom,
+		};
+		static auto to_string( type t ) noexcept {
+			static char const *const result[] = {
+			    "Access denied, enable_clipboard feature is not enabled",
 			    "Access denied, enable_command_line feature is not enabled.",
-			}[static_cast<uint8_t>( t )];
+			    "Access denied, enable_edit feature is not enabled",
+			    "Access denied, enable_naviation feature is not enabled",
+			    "Access denied, enable_printing feature is not enabled",
+			    "Access denied, enable_reload feature is not enabled",
+			    "Access denied, enable_search feature is not enabled",
+			    "Access denied, enable_select feature is not enabled",
+			    "Access denied, enable_view_source feature is not enabled",
+			    "Access denied, enable_view_text feature is not enabled",
+			    "Access denied, enable_zoom feature is not enabled",
+			};
+			return result[static_cast<uint8_t>( t )];
 		}
 		config_param_t( ) = default;
 		~config_param_t( ) = default;
@@ -88,12 +129,12 @@ class WebFrame;
 
 class WebApp : public wxApp {
 	wxString m_url;
-	std::unique_ptr<WebFrame> m_frame;
+	WebFrame *m_frame;
 	config_t m_app_config;
 
   public:
 	WebApp( );
-	virtual ~WebApp( ) = default;
+	virtual ~WebApp( );
 	WebApp( WebApp const & ) = default;
 	WebApp( WebApp && ) = default;
 	WebApp &operator=( WebApp const & ) = default;
@@ -101,9 +142,9 @@ class WebApp : public wxApp {
 
 	bool OnInit( ) override;
 
-	void OnInitCmdLine( wxCmdLineParser & parser ) override {
+	void OnInitCmdLine( wxCmdLineParser &parser ) override {
 		if( parser.GetParamCount( ) > 0 && !m_app_config.enable_command_line ) {
-			throw config_denied_exception{ config_denied_exception_kind::enable_command_line };
+			throw config_denied_exception{config_denied_exception_kind::enable_command_line};
 		}
 		wxApp::OnInitCmdLine( parser );
 		parser.AddParam( "URL to open", wxCMD_LINE_VAL_STRING, wxCMD_LINE_PARAM_OPTIONAL );
@@ -177,9 +218,10 @@ class WebFrame : public wxFrame {
 	wxString m_findText;
 	int m_findFlags;
 	int m_findCount;
+	config_t const *m_app_config;
 
   public:
-	WebFrame( wxString const & url );
+	WebFrame( wxString const &url, config_t const &app_config );
 	virtual ~WebFrame( );
 	WebFrame( WebFrame && ) = default;
 	WebFrame &operator=( WebFrame && ) = default;
@@ -270,7 +312,7 @@ bool WebApp::OnInit( ) {
 
 	// Create the memory files
 	wxImage::AddHandler( new wxPNGHandler );
-	//wxMemoryFSHandler::AddFile( "logo.png", wxBitmap{wxlogo_xpm}, wxBITMAP_TYPE_PNG );
+	wxMemoryFSHandler::AddFile( "logo.png", wxBitmap{wxlogo_xpm}, wxBITMAP_TYPE_PNG );
 	wxMemoryFSHandler::AddFile( "page1.htm", "<html><head><title>File System Example</title>"
 	                                         "<link rel='stylesheet' type='text/css' href='memory:test.css'>"
 	                                         "</head><body><h1>Page 1</h1>"
@@ -282,25 +324,24 @@ bool WebApp::OnInit( ) {
 	                                         "<p><a href='memory:page1.htm'>Page 1</a> was better.</p></body>" );
 	wxMemoryFSHandler::AddFile( "test.css", "h1 {color: red;}" );
 
-	m_frame = std::make_unique<WebFrame>( "http://www.google.ca" );
+	m_frame = new WebFrame{"http://www.google.ca", m_app_config};
 	m_frame->Show( );
 
 	return true;
 }
 
-WebApp::WebApp( ) : m_url{ "http://localhost" }, m_frame{} /*, m_app_config{}*/ {
-	/*m_app_config = config_t{};
+WebApp::WebApp( ) : m_url{"http://localhost"}, m_frame{}, m_app_config{} {
 	if( m_app_config.home_url.size( ) > 0 ) {
 		m_url = m_app_config.home_url;
 	}
-	*/
 }
 
-WebFrame::WebFrame( wxString const & url ) : wxFrame{nullptr, wxID_ANY, "wxWebView Sample"} {
+WebFrame::WebFrame( wxString const &url, config_t const &app_config )
+    : wxFrame{nullptr, wxID_ANY, app_config.app_title.c_str( )}, m_app_config{&app_config} {
 
 	// set the frame icon
-	//SetIcon( wxICON( sample ) );
-	SetTitle( "wxWebView Sample" );
+	SetIcon( wxICON( sample ) );
+	SetTitle( m_app_config->app_title.c_str( ) );
 
 	auto topsizer = std::make_unique<wxBoxSizer>( wxVERTICAL );
 
@@ -327,7 +368,7 @@ WebFrame::WebFrame( wxString const & url ) : wxFrame{nullptr, wxID_ANY, "wxWebVi
 	m_toolbar_reload = m_toolbar->AddTool( wxID_ANY, _( "Reload" ), refresh );
 	m_url = new wxTextCtrl{m_toolbar, wxID_ANY, wxT( "" ), wxDefaultPosition, wxSize{400, -1}, wxTE_PROCESS_ENTER};
 	m_toolbar->AddControl( m_url, _( "URL" ) );
-	//m_toolbar_tools = m_toolbar->AddTool( wxID_ANY, _( "Menu" ), wxBitmap( wxlogo_xpm ) );
+	m_toolbar_tools = m_toolbar->AddTool( wxID_ANY, _( "Menu" ), wxBitmap( wxlogo_xpm ) );
 
 	m_toolbar->Realize( );
 
@@ -548,8 +589,8 @@ WebFrame::WebFrame( wxString const & url ) : wxFrame{nullptr, wxID_ANY, "wxWebVi
 WebFrame::~WebFrame( ) {}
 
 /**
- * Method that retrieves the current state from the web control and updates the GUI
- * the reflect this current state.
+ * Method that retrieves the current state from the web control and updates the
+ * GUI the reflect this current state.
  */
 void WebFrame::UpdateState( ) {
 	m_toolbar->EnableTool( m_toolbar_back->GetId( ), m_browser->CanGoBack( ) );
@@ -579,7 +620,7 @@ void WebFrame::OnIdle( wxIdleEvent &WXUNUSED( evt ) ) {
  * Callback invoked when user entered an URL and pressed enter
  */
 void WebFrame::OnUrl( wxCommandEvent &WXUNUSED( evt ) ) {
-	if( !m_app_config.is_valid_url( m_url ) ) {
+	if( !m_app_config->is_valid_url( m_url->GetValue( ) ) ) {
 		return;
 	}
 	m_browser->LoadURL( m_url->GetValue( ) );
@@ -591,7 +632,7 @@ void WebFrame::OnUrl( wxCommandEvent &WXUNUSED( evt ) ) {
  * Callback invoked when user pressed the "back" button
  */
 void WebFrame::OnBack( wxCommandEvent &WXUNUSED( evt ) ) {
-	if( !m_app_config.enable_navigation ) {
+	if( !m_app_config->enable_navigation ) {
 		return;
 	}
 	m_browser->GoBack( );
@@ -602,7 +643,7 @@ void WebFrame::OnBack( wxCommandEvent &WXUNUSED( evt ) ) {
  * Callback invoked when user pressed the "forward" button
  */
 void WebFrame::OnForward( wxCommandEvent &WXUNUSED( evt ) ) {
-	if( !m_app_config.enable_navigation ) {
+	if( !m_app_config->enable_navigation ) {
 		return;
 	}
 	m_browser->GoForward( );
@@ -621,7 +662,7 @@ void WebFrame::OnStop( wxCommandEvent &WXUNUSED( evt ) ) {
  * Callback invoked when user pressed the "reload" button
  */
 void WebFrame::OnReload( wxCommandEvent &WXUNUSED( evt ) ) {
-	if( !m_app_config.enable_reload ) {
+	if( !m_app_config->enable_reload ) {
 		return;
 	}
 	m_browser->Reload( );
@@ -639,42 +680,42 @@ void WebFrame::OnEnableHistory( wxCommandEvent &WXUNUSED( evt ) ) {
 }
 
 void WebFrame::OnCut( wxCommandEvent &WXUNUSED( evt ) ) {
-	if( !m_app_config.enable_clipboard || !m_app_config.enable_edit ) {
+	if( !m_app_config->enable_clipboard || !m_app_config->enable_edit ) {
 		return;
 	}
 	m_browser->Cut( );
 }
 
 void WebFrame::OnCopy( wxCommandEvent &WXUNUSED( evt ) ) {
-	if( !m_app_config.enable_clipboard ) {
+	if( !m_app_config->enable_clipboard ) {
 		return;
 	}
 	m_browser->Copy( );
 }
 
 void WebFrame::OnPaste( wxCommandEvent &WXUNUSED( evt ) ) {
-	if( !m_app_config.enable_clipboard || !m_app_config.enable_edit ) {
+	if( !m_app_config->enable_clipboard || !m_app_config->enable_edit ) {
 		return;
 	}
 	m_browser->Paste( );
 }
 
 void WebFrame::OnUndo( wxCommandEvent &WXUNUSED( evt ) ) {
-	if( !m_app_config.enable_edit ) {
+	if( !m_app_config->enable_edit ) {
 		return;
 	}
 	m_browser->Undo( );
 }
 
 void WebFrame::OnRedo( wxCommandEvent &WXUNUSED( evt ) ) {
-	if( !m_app_config.enable_edit ) {
+	if( !m_app_config->enable_edit ) {
 		return;
 	}
 	m_browser->Redo( );
 }
 
 void WebFrame::OnMode( wxCommandEvent &WXUNUSED( evt ) ) {
-	if( !m_app_config.enable_edit ) {
+	if( !m_app_config->enable_edit ) {
 		return;
 	}
 	m_browser->SetEditable( m_edit_mode->IsChecked( ) );
@@ -699,7 +740,7 @@ void WebFrame::OnEnableContextMenu( wxCommandEvent &evt ) {
 }
 
 void WebFrame::OnFind( wxCommandEvent &WXUNUSED( evt ) ) {
-	if( !m_app_config.enable_search ) {
+	if( !m_app_config->enable_search ) {
 		return;
 	}
 	auto value = m_browser->GetSelectedText( );
@@ -715,7 +756,7 @@ void WebFrame::OnFind( wxCommandEvent &WXUNUSED( evt ) ) {
 }
 
 void WebFrame::OnFindDone( wxCommandEvent &WXUNUSED( evt ) ) {
-	if( !m_app_config.enable_search ) {
+	if( !m_app_config->enable_search ) {
 		return;
 	}
 	m_browser->Find( "" );
@@ -724,7 +765,7 @@ void WebFrame::OnFindDone( wxCommandEvent &WXUNUSED( evt ) ) {
 }
 
 void WebFrame::OnFindText( wxCommandEvent &evt ) {
-	if( !m_app_config.enable_search ) {
+	if( !m_app_config->enable_search ) {
 		return;
 	}
 	int flags = 0;
@@ -777,7 +818,7 @@ void WebFrame::OnFindText( wxCommandEvent &evt ) {
  * when the user clicks a link)
  */
 void WebFrame::OnNavigationRequest( wxWebViewEvent &evt ) {
-	if( !m_app_config.enable_navigation ) {
+	if( !m_app_config->enable_navigation ) {
 		evt.Veto( );
 		m_toolbar->EnableTool( m_toolbar_stop->GetId( ), false );
 		return;
@@ -842,9 +883,8 @@ void WebFrame::OnTitleChanged( wxWebViewEvent &evt ) {
 /**
  * Invoked when user selects the "View Source" menu item
  */
-void WebFrame::OnViewSourceRequest( wxCommandEvent & evt ) {
-	if( !m_app_config.enable_view_source )
-		evt.Veto( );
+void WebFrame::OnViewSourceRequest( wxCommandEvent &WXUNUSED( evt ) ) {
+	if( !m_app_config->enable_view_source ) {
 		return;
 	}
 	SourceViewDialog dlg( this, m_browser->GetPageSource( ) );
@@ -854,18 +894,17 @@ void WebFrame::OnViewSourceRequest( wxCommandEvent & evt ) {
 /**
  * Invoked when user selects the "View Text" menu item
  */
-void WebFrame::OnViewTextRequest( wxCommandEvent & evt ) {
-	if( !m_app_config.enable_view_text )
-		evt.Veto( );
+void WebFrame::OnViewTextRequest( wxCommandEvent &WXUNUSED( evt ) ) {
+	if( !m_app_config->enable_view_text ) {
 		return;
 	}
 	wxDialog textViewDialog{
 	    this, wxID_ANY, "Page Text", wxDefaultPosition, wxSize{700, 500}, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER};
 	auto text = std::make_unique<wxStyledTextCtrl>( &textViewDialog, wxID_ANY );
 	text->SetText( m_browser->GetPageText( ) );
-	wxBoxSizer *sizer = new wxBoxSizer( wxVERTICAL );
+	auto sizer = std::make_unique<wxBoxSizer>( wxVERTICAL );
 	sizer->Add( text.release( ), 1, wxEXPAND );
-	SetSizer( sizer );
+	SetSizer( sizer.release( ) );
 	textViewDialog.ShowModal( );
 }
 
@@ -883,7 +922,7 @@ void WebFrame::OnToolsClicked( wxCommandEvent &WXUNUSED( evt ) ) {
 	m_tools_large->Check( false );
 	m_tools_largest->Check( false );
 
-	wxWebViewZoom zoom = m_browser->GetZoom( );
+	auto zoom = m_browser->GetZoom( );
 	switch( zoom ) {
 	case wxWEBVIEW_ZOOM_TINY:
 		m_tools_tiny->Check( );
@@ -959,8 +998,7 @@ void WebFrame::OnToolsClicked( wxCommandEvent &WXUNUSED( evt ) ) {
  * Invoked when user selects the zoom size in the menu
  */
 void WebFrame::OnSetZoom( wxCommandEvent &evt ) {
-	if( !m_app_config.enable_zoom ) {
-		evt.Veto( );
+	if( !m_app_config->enable_zoom ) {
 		return;
 	}
 	if( evt.GetId( ) == m_tools_tiny->GetId( ) ) {
@@ -979,8 +1017,7 @@ void WebFrame::OnSetZoom( wxCommandEvent &evt ) {
 }
 
 void WebFrame::OnZoomLayout( wxCommandEvent &WXUNUSED( evt ) ) {
-	if( !m_app_config.enable_zoom ) {
-		evt.Veto( );
+	if( !m_app_config->enable_zoom ) {
 		return;
 	}
 	if( m_tools_layout->IsChecked( ) ) {
@@ -1003,24 +1040,21 @@ void WebFrame::OnRunScript( wxCommandEvent &WXUNUSED( evt ) ) {
 }
 
 void WebFrame::OnClearSelection( wxCommandEvent &WXUNUSED( evt ) ) {
-	if( !m_app_config.enable_select ) {
-		evt.Veto( );
+	if( !m_app_config->enable_select ) {
 		return;
 	}
 	m_browser->ClearSelection( );
 }
 
 void WebFrame::OnDeleteSelection( wxCommandEvent &WXUNUSED( evt ) ) {
-	if( !m_app_config.enable_select ) {
-		evt.Veto( );
+	if( !m_app_config->enable_select ) {
 		return;
 	}
 	m_browser->DeleteSelection( );
 }
 
 void WebFrame::OnSelectAll( wxCommandEvent &WXUNUSED( evt ) ) {
-	if( !m_app_config.enable_select ) {
-		evt.Veto( );
+	if( !m_app_config->enable_select ) {
 		return;
 	}
 	m_browser->SelectAll( );
@@ -1057,12 +1091,13 @@ void WebFrame::OnError( wxWebViewEvent &evt ) {
 }
 
 void WebFrame::OnPrint( wxCommandEvent &WXUNUSED( evt ) ) {
-	if( !m_app_config.enable_print ) {
-		evt.Veto( );
+	if( !m_app_config->enable_printing ) {
 		return;
 	}
 	m_browser->Print( );
 }
+
+WebApp::~WebApp( ) {}
 
 SourceViewDialog::SourceViewDialog( wxWindow *parent, wxString source )
     : wxDialog{parent,           wxID_ANY,
@@ -1089,4 +1124,3 @@ SourceViewDialog::SourceViewDialog( wxWindow *parent, wxString source )
 	sizer->Add( text.release( ), 1, wxEXPAND );
 	SetSizer( sizer.release( ) );
 }
-
