@@ -20,11 +20,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "web_browser_app.h"
+#include <boost/filesystem/path.hpp>
+#include <wx/stdpaths.h>
+
 #include "config.h"
+#include "web_browser_app.h"
 
 void WebApp::OnInitCmdLine( wxCmdLineParser &parser ) {
-	if( parser.GetParamCount( ) > 0 && !m_app_config.enable_command_line ) {
+	if( !m_app_config.enable_command_line && parser.GetParamCount( ) > 0 ) {
 		throw config_denied_exception{config_denied_exception_kind::enable_command_line};
 	}
 	wxApp::OnInitCmdLine( parser );
@@ -63,48 +66,54 @@ SourceViewDialog::~SourceViewDialog( ) {}
 
 wxIMPLEMENT_APP( WebApp );
 
+namespace {
+	auto get_exec_path( ) {
+		static auto const p_str = wxStandardPaths::Get( ).GetExecutablePath( );
+		return boost::filesystem::path{p_str.mb_str( wxConvUTF8 ).data( )};
+	}
+	auto get_config_file( ) {
+		return get_exec_path( ).replace_extension( ".config" ).string( );
+	}
+} // namespace
+
 bool WebApp::OnInit( ) {
 	if( !wxApp::OnInit( ) ) {
 		return false;
 	}
-	
-	
 
-	// Required for virtual file system archive and memory support
-	wxFileSystem::AddHandler( new wxArchiveFSHandler );
-	wxFileSystem::AddHandler( new wxMemoryFSHandler );
+	{
+		static auto const conf_file = get_config_file( );
+		if( !boost::filesystem::exists( conf_file ) ) {
+			m_app_config.to_file( conf_file, false );
+		} else {
+			m_app_config = daw::json::from_file<config_t>( conf_file );
+		}
+	}
 
-	// Create the memory files
-	wxImage::AddHandler( new wxPNGHandler );
-	wxMemoryFSHandler::AddFile( "logo.png", wxBitmap{wxlogo_xpm}, wxBITMAP_TYPE_PNG );
-	wxMemoryFSHandler::AddFile( "page1.htm", "<html><head><title>File System Example</title>"
-	                                         "<link rel='stylesheet' type='text/css' href='memory:test.css'>"
-	                                         "</head><body><h1>Page 1</h1>"
-	                                         "<p><img src='memory:logo.png'></p>"
-	                                         "<p>Some text about <a href='memory:page2.htm'>Page 2</a>.</p></body>" );
-	wxMemoryFSHandler::AddFile( "page2.htm", "<html><head><title>File System Example</title>"
-	                                         "<link rel='stylesheet' type='text/css' href='memory:test.css'>"
-	                                         "</head><body><h1>Page 2</h1>"
-	                                         "<p><a href='memory:page1.htm'>Page 1</a> was better.</p></body>" );
-	wxMemoryFSHandler::AddFile( "test.css", "h1 {color: red;}" );
-
-	m_frame = new WebFrame{"https://www.youtube.com", m_app_config};
+	if( m_app_config.home_url.empty( ) ) {
+		m_app_config.home_url = "http://localhost";
+	}
+	m_frame = new WebFrame{m_app_config.home_url, m_app_config};
 	m_frame->Show( );
 
 	return true;
 }
 
-WebApp::WebApp( ) : m_url{"http://localhost"}, m_frame{}, m_app_config{} {
-	if( m_app_config.home_url.size( ) > 0 ) {
-		m_url = m_app_config.home_url;
-	}
-}
+WebApp::WebApp( ) : m_url{}, m_frame{}, m_app_config{} {}
 
 WebFrame::WebFrame( wxString const &url, config_t const &app_config )
     : wxFrame{nullptr, wxID_ANY, app_config.app_title.c_str( )}, m_app_config{&app_config} {
 
-	// set the frame icon
-	SetIcon( wxICON( sample ) );
+	if( boost::filesystem::exists( m_app_config->app_icon ) &&
+	    boost::filesystem::is_regular_file( m_app_config->app_icon ) ) {
+		wxString const icon_path{m_app_config->app_icon};
+		wxBitmap const bmp{wxImage{icon_path}};
+		wxIcon icon;
+		icon.CopyFromBitmap( bmp );
+		SetIcon( icon );
+	} else {
+		wxLogMessage( "%s", "Error: invalid app_icon path in config; path='" + m_app_config->app_icon + "'" );
+	}
 	wxFrame::SetTitle( m_app_config->app_title.c_str( ) );
 
 	auto topsizer = std::make_unique<wxBoxSizer>( wxVERTICAL );
@@ -568,7 +577,7 @@ void WebFrame::OnFindText( wxCommandEvent &evt ) {
 	auto count = m_browser->Find( find_text, flags );
 
 	if( m_findText != find_text ) {
-		m_findCount = static_cast<int>(count);
+		m_findCount = static_cast<int>( count );
 		m_findText = find_text;
 	}
 
@@ -899,4 +908,3 @@ SourceViewDialog::SourceViewDialog( wxWindow *parent, wxString source )
 	sizer->Add( text.release( ), 1, wxEXPAND );
 	SetSizer( sizer.release( ) );
 }
-

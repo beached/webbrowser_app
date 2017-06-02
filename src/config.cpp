@@ -70,8 +70,9 @@ void url_validation_t::link_json( ) {
 
 config_t::config_t( )
     : daw::json::JsonLink<config_t>{}
-    , home_url{}
+    , app_icon{}
     , app_title{}
+    , home_url{}
     , enable_clipboard{true}
     , enable_command_line{true}
     , enable_debug_window{true}
@@ -92,8 +93,9 @@ config_t::config_t( )
 
 config_t::config_t( config_t const &other )
     : daw::json::JsonLink<config_t>{}
-    , home_url{other.home_url}
+    , app_icon{other.app_icon}
     , app_title{other.app_title}
+    , home_url{other.home_url}
     , enable_clipboard{other.enable_clipboard}
     , enable_command_line{other.enable_command_line}
     , enable_debug_window{other.enable_debug_window}
@@ -114,8 +116,9 @@ config_t::config_t( config_t const &other )
 
 config_t::config_t( config_t &&other )
     : daw::json::JsonLink<config_t>{}
-    , home_url{std::move( other.home_url )}
+    , app_icon{std::move( other.app_icon )}
     , app_title{std::move( other.app_title )}
+    , home_url{std::move( other.home_url )}
     , enable_clipboard{std::move( other.enable_clipboard )}
     , enable_command_line{std::move( other.enable_command_line )}
     , enable_debug_window{std::move( other.enable_debug_window )}
@@ -135,35 +138,66 @@ config_t::config_t( config_t &&other )
 }
 
 config_t &config_t::operator=( config_t const &rhs ) {
-	using std::swap;
-	config_t tmp{rhs};
-	swap( *this, tmp );
+	app_icon = rhs.app_icon;
+	app_title = rhs.app_title;
+	home_url = rhs.home_url;
+	url_validators = rhs.url_validators;
+	enable_clipboard = rhs.enable_clipboard;
+	enable_command_line = rhs.enable_command_line;
+	enable_debug_window = rhs.enable_debug_window;
+	enable_edit = rhs.enable_edit;
+	enable_navigation = rhs.enable_navigation;
+	enable_printing = rhs.enable_printing;
+	enable_reload = rhs.enable_reload;
+	enable_search = rhs.enable_search;
+	enable_select = rhs.enable_select;
+	enable_title_change = rhs.enable_title_change;
+	enable_toolbar = rhs.enable_toolbar;
+	enable_view_source = rhs.enable_view_source;
+	enable_view_text = rhs.enable_view_text;
+	enable_zoom = rhs.enable_zoom;
 	return *this;
 }
 
 config_t &config_t::operator=( config_t &&rhs ) {
-	using std::swap;
-	config_t tmp{std::move( rhs )};
-	swap( *this, tmp );
+	app_icon = std::move( rhs.app_icon );
+	app_title = std::move( rhs.app_title );
+	home_url = std::move( rhs.home_url );
+	url_validators = std::move( rhs.url_validators );
+	enable_clipboard = std::move( rhs.enable_clipboard );
+	enable_command_line = std::move( rhs.enable_command_line );
+	enable_debug_window = std::move( rhs.enable_debug_window );
+	enable_edit = std::move( rhs.enable_edit );
+	enable_navigation = std::move( rhs.enable_navigation );
+	enable_printing = std::move( rhs.enable_printing );
+	enable_reload = std::move( rhs.enable_reload );
+	enable_search = std::move( rhs.enable_search );
+	enable_select = std::move( rhs.enable_select );
+	enable_title_change = std::move( rhs.enable_title_change );
+	enable_toolbar = std::move( rhs.enable_toolbar );
+	enable_view_source = std::move( rhs.enable_view_source );
+	enable_view_text = std::move( rhs.enable_view_text );
+	enable_zoom = std::move( rhs.enable_zoom );
 	return *this;
 }
 
 void config_t::link_json( ) {
-	this->link_string( "home_url", home_url );
+	this->link_string( "app_icon", app_icon );
 	this->link_string( "app_title", app_title );
-	this->link_boolean( "enable_clipboard ", enable_clipboard );
-	this->link_boolean( "enable_command_line ", enable_command_line );
-	this->link_boolean( "enable_debug_window ", enable_debug_window );
-	this->link_boolean( "enable_edit ", enable_edit );
-	this->link_boolean( "enable_navigation ", enable_navigation );
-	this->link_boolean( "enable_printing ", enable_printing );
-	this->link_boolean( "enable_reload ", enable_reload );
-	this->link_boolean( "enable_search ", enable_search );
-	this->link_boolean( "enable_select ", enable_select );
-	this->link_boolean( "enable_title_change ", enable_title_change );
-	this->link_boolean( "enable_toolbar ", enable_toolbar );
-	this->link_boolean( "enable_view_source ", enable_view_source );
-	this->link_boolean( "enable_view_text ", enable_view_text );
+	this->link_string( "home_url", home_url );
+	this->link_boolean( "enable_clipboard", enable_clipboard );
+	this->link_boolean( "enable_command_line", enable_command_line );
+	this->link_boolean( "enable_debug_window", enable_debug_window );
+	this->link_boolean( "enable_edit", enable_edit );
+	this->link_boolean( "enable_navigation", enable_navigation );
+	this->link_boolean( "enable_printing", enable_printing );
+	this->link_boolean( "enable_reload", enable_reload );
+	this->link_boolean( "enable_search", enable_search );
+	this->link_boolean( "enable_select", enable_select );
+	this->link_boolean( "enable_title_change", enable_title_change );
+	this->link_boolean( "enable_toolbar", enable_toolbar );
+	this->link_boolean( "enable_view_source", enable_view_source );
+	this->link_boolean( "enable_view_text", enable_view_text );
 	this->link_boolean( "enable_zoom", enable_zoom );
 }
 
@@ -192,4 +226,3 @@ config_denied_exception::~config_denied_exception( ) {}
 
 config_denied_exception::config_denied_exception( config_param_t::type ex_type )
     : std::runtime_error{config_param_t::to_string( ex_type )} {}
-

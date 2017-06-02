@@ -52,7 +52,6 @@
 #include "../images/stop.xpm"
 #endif
 
-#include "../images/sample.xpm"
 #include "../images/wxlogo.xpm"
 
 #include "config.h"

@@ -33,11 +33,11 @@ struct url_validation_t : public daw::json::JsonLink<url_validation_t> {
 	bool is_regex;
 	std::string url;
 
-	url_validation_t( ); 
-	url_validation_t( url_validation_t const & other );
-	url_validation_t( url_validation_t && other ); 
-	url_validation_t &operator=( url_validation_t const & rhs );
-	url_validation_t &operator=( url_validation_t && rhs );
+	url_validation_t( );
+	url_validation_t( url_validation_t const &other );
+	url_validation_t( url_validation_t &&other );
+	url_validation_t &operator=( url_validation_t const &rhs );
+	url_validation_t &operator=( url_validation_t &&rhs );
 	~url_validation_t( );
 
   private:
@@ -45,8 +45,9 @@ struct url_validation_t : public daw::json::JsonLink<url_validation_t> {
 }; // url_validation_t
 
 struct config_t : public daw::json::JsonLink<config_t> {
-	std::string home_url;
+	std::string app_icon;
 	std::string app_title;
+	std::string home_url;
 	std::vector<url_validation_t> url_validators;
 	bool enable_clipboard;
 	bool enable_command_line;
@@ -66,10 +67,10 @@ struct config_t : public daw::json::JsonLink<config_t> {
 	bool is_valid_url( boost::string_view url ) const;
 
 	config_t( );
-	config_t( config_t const & );
-	config_t &operator=( config_t const & );
-	config_t( config_t && );
-	config_t &operator=( config_t && );
+	config_t( config_t const &other );
+	config_t( config_t &&other );
+	config_t &operator=( config_t const &rhs );
+	config_t &operator=( config_t &&rhs );
 	~config_t( );
 
   private:
