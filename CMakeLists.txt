@@ -12,9 +12,9 @@ if( ${CMAKE_CXX_COMPILER_ID} STREQUAL 'MSVC' )
 	add_compile_options( -D_WIN32_WINNT=0x0601 /std:c++latest ) 
 else( )
 	if( ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang" )
-		add_compile_options(-std=c++14 -Weverything -pthread -Wno-c++98-compat -g -Wno-covered-switch-default -Wno-padded -Wno-exit-time-destructors -Wno-c++98-compat-pedantic -Wno-unused-parameter -Wno-missing-noreturn -Wno-missing-prototypes -Wno-disabled-macro-expansion)
+		add_compile_options(-std=c++14 -O3 -Weverything -pthread -Wno-c++98-compat -g -Wno-covered-switch-default -Wno-padded -Wno-exit-time-destructors -Wno-c++98-compat-pedantic -Wno-unused-parameter -Wno-missing-noreturn -Wno-missing-prototypes -Wno-disabled-macro-expansion)
 	elseif( ${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" )
-		add_compile_options(-std=c++14 -g -Wall -pthread -Wno-deprecated-declarations)
+		add_compile_options(-std=c++14 -O3 -g -Wall -pthread -Wno-deprecated-declarations)
 	endif( )
 endif( )
 
@@ -45,25 +45,39 @@ externalproject_add(
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/install
 )
 
+externalproject_add(
+	date_prj
+	GIT_REPOSITORY "https://github.com/beached/date.git"
+	SOURCE_DIR "${CMAKE_BINARY_DIR}/dependencies/date"
+	GIT_TAG "master"
+	INSTALL_DIR "${CMAKE_BINARY_DIR}/install"
+	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/install
+)
 
 set( HEADER_FOLDER "include" )
 set( SOURCE_FOLDER "src" )
 set( TEST_FOLDER "tests" )
 
 include_directories( SYSTEM "${CMAKE_BINARY_DIR}/install/include" )
+link_directories( "${CMAKE_BINARY_DIR}/install/lib" )
 include_directories( ${HEADER_FOLDER} )
 
 
 set( SOURCE_FILES
-	web_browser_app.cpp
+	${SOURCE_FOLDER}/web_browser_app.cpp
+	${SOURCE_FOLDER}/config.cpp
 )
 
+set( HEADER_FILES
+	${HEADER_FOLDER}/web_browser_app.h
+	${HEADER_FOLDER}/config.h
+)
 
 include_directories( SYSTEM ${Boost_INCLUDE_DIRS} )
 link_directories( ${Boost_LIBRARY_DIRS} )
 
 include( ${wxWidgets_USE_FILE} )
 
-add_executable( web_browser_app_bin ${SOURCE_FILES} )
-add_dependencies( web_browser_app_bin header_libraries_prj char_range_prj parse_json_prj  )
-target_link_libraries( web_browser_app_bin char_range parse_json ${CMAKE_DL_LIBS} ${Boost_Libs} ${CMAKE_THREAD_LIBS_INIT} ${COMPILER_SPECIFIC_LIBS} ${wxWidgets_LIBRARIES} )
+add_executable( web_browser_app_bin ${HEADER_FILES} ${SOURCE_FILES} )
+add_dependencies( web_browser_app_bin header_libraries_prj char_range_prj date_prj parse_json_prj  )
+target_link_libraries( web_browser_app_bin char_range parse_json ${CMAKE_DL_LIBS} ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${COMPILER_SPECIFIC_LIBS} ${wxWidgets_LIBRARIES} )
