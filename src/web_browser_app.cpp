@@ -64,7 +64,7 @@ void WebFrame::OnScrollPageDown( wxCommandEvent & ) {
 
 SourceViewDialog::~SourceViewDialog( ) {}
 
-wxIMPLEMENT_APP( WebApp );
+wxIMPLEMENT_APP_CONSOLE( WebApp );
 
 namespace {
 	auto get_exec_path( ) {

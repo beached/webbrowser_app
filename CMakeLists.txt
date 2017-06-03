@@ -6,7 +6,7 @@ include( ExternalProject )
 
 find_package( Boost 1.60.0 COMPONENTS system filesystem regex iostreams unit_test_framework REQUIRED ) 
 
-find_package( wxWidgets REQUIRED webview stc adv core base )
+find_package( wxWidgets COMPONENTS webview stc adv core base net gl std aui html media xrc dbgrid qa richtext ribbon propgrid scintilla REQUIRED )
 
 if( ${CMAKE_CXX_COMPILER_ID} STREQUAL 'MSVC' )
 	add_compile_options( -D_WIN32_WINNT=0x0601 /std:c++latest ) 
