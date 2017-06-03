@@ -41,7 +41,7 @@ url_validation_t::url_validation_t( url_validation_t const &other )
 	link_json( );
 }
 
-url_validation_t::url_validation_t( url_validation_t &&other )
+url_validation_t::url_validation_t( url_validation_t &&other ) noexcept
     : daw::json::JsonLink<url_validation_t>{}, is_regex{std::move( other.is_regex )}, url{std::move( other.url )} {
 
 	link_json( );
@@ -54,7 +54,7 @@ url_validation_t &url_validation_t::operator=( url_validation_t const &rhs ) {
 	return *this;
 }
 
-url_validation_t &url_validation_t::operator=( url_validation_t &&rhs ) {
+url_validation_t &url_validation_t::operator=( url_validation_t &&rhs ) noexcept {
 	using std::swap;
 	url_validation_t tmp{std::move( rhs )};
 	swap( *this, tmp );
@@ -114,7 +114,7 @@ config_t::config_t( config_t const &other )
 	link_json( );
 }
 
-config_t::config_t( config_t &&other )
+config_t::config_t( config_t &&other ) noexcept
     : daw::json::JsonLink<config_t>{}
     , app_icon{std::move( other.app_icon )}
     , app_title{std::move( other.app_title )}
@@ -159,7 +159,7 @@ config_t &config_t::operator=( config_t const &rhs ) {
 	return *this;
 }
 
-config_t &config_t::operator=( config_t &&rhs ) {
+config_t &config_t::operator=( config_t &&rhs ) noexcept {
 	app_icon = std::move( rhs.app_icon );
 	app_title = std::move( rhs.app_title );
 	home_url = std::move( rhs.home_url );

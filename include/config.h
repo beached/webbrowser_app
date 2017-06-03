@@ -35,9 +35,9 @@ struct url_validation_t : public daw::json::JsonLink<url_validation_t> {
 
 	url_validation_t( );
 	url_validation_t( url_validation_t const &other );
-	url_validation_t( url_validation_t &&other );
+	url_validation_t( url_validation_t &&other ) noexcept;
 	url_validation_t &operator=( url_validation_t const &rhs );
-	url_validation_t &operator=( url_validation_t &&rhs );
+	url_validation_t &operator=( url_validation_t &&rhs ) noexcept;
 	~url_validation_t( );
 
   private:
@@ -68,9 +68,9 @@ struct config_t : public daw::json::JsonLink<config_t> {
 
 	config_t( );
 	config_t( config_t const &other );
-	config_t( config_t &&other );
+	config_t( config_t &&other ) noexcept;
 	config_t &operator=( config_t const &rhs );
-	config_t &operator=( config_t &&rhs );
+	config_t &operator=( config_t &&rhs ) noexcept;
 	~config_t( );
 
   private:
@@ -114,4 +114,3 @@ struct config_denied_exception : public std::runtime_error {
 	explicit config_denied_exception( config_param_t::type ex_type );
 }; // config_denied_exception
 using config_denied_exception_kind = config_denied_exception::config_param_t::type;
-

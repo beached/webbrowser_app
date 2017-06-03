@@ -21,10 +21,22 @@
 // SOFTWARE.
 
 #include <boost/filesystem/path.hpp>
+#include <wx/artprov.h>
+#include <wx/cmdline.h>
+#include <wx/filesys.h>
+#include <wx/notifmsg.h>
 #include <wx/stdpaths.h>
+#include <wx/webviewfshandler.h>
 
 #include "config.h"
 #include "web_browser_app.h"
+
+#if defined( __WXMSW__ ) || defined( __WXOSX__ )
+#include "../images/refresh.xpm"
+#include "../images/stop.xpm"
+#endif
+
+#include "../images/wxlogo.xpm"
 
 void WebApp::OnInitCmdLine( wxCmdLineParser &parser ) {
 	if( !m_app_config.enable_command_line && parser.GetParamCount( ) > 0 ) {
@@ -68,11 +80,16 @@ wxIMPLEMENT_APP_CONSOLE( WebApp );
 
 namespace {
 	auto get_exec_path( ) {
-		static auto const p_str = wxStandardPaths::Get( ).GetExecutablePath( );
-		return boost::filesystem::path{p_str.mb_str( wxConvUTF8 ).data( )};
+#ifdef WIN32
+		auto const p_str = wxStandardPaths::Get( ).GetExecutablePath( ).ToStdWstring( );
+#else
+		auto const p_str = wxStandardPaths::Get( ).GetExecutablePath( ).ToStdString( );
+#endif
+		return boost::filesystem::path{p_str.c_str( )};
 	}
 	auto get_config_file( ) {
-		return get_exec_path( ).replace_extension( ".config" ).string( );
+		auto p_result = get_exec_path( );
+		return p_result.replace_extension( ".config" ).string( );
 	}
 } // namespace
 
@@ -81,13 +98,16 @@ bool WebApp::OnInit( ) {
 		return false;
 	}
 
-	{
-		static auto const conf_file = get_config_file( );
+	try {
+		auto const conf_file = get_config_file( );
 		if( !boost::filesystem::exists( conf_file ) ) {
 			m_app_config.to_file( conf_file, false );
 		} else {
 			m_app_config = daw::json::from_file<config_t>( conf_file );
 		}
+	} catch( std::exception const &ex ) {
+		std::cerr << "Error getting config file path: " << ex.what( ) << '\n';
+		std::terminate( );
 	}
 
 	if( m_app_config.home_url.empty( ) ) {
@@ -106,11 +126,16 @@ WebFrame::WebFrame( wxString const &url, config_t const &app_config )
 
 	if( boost::filesystem::exists( m_app_config->app_icon ) &&
 	    boost::filesystem::is_regular_file( m_app_config->app_icon ) ) {
-		wxString const icon_path{m_app_config->app_icon};
-		wxBitmap const bmp{wxImage{icon_path}};
-		wxIcon icon;
-		icon.CopyFromBitmap( bmp );
-		SetIcon( icon );
+		try {
+			wxString const icon_path{m_app_config->app_icon};
+			wxBitmap const bmp{wxImage{icon_path}};
+			wxIcon icon;
+			icon.CopyFromBitmap( bmp );
+			SetIcon( icon );
+		} catch( std::exception const &ex ) {
+			wxLogMessage( "%s", "Error: could not load app_icon; path='" + m_app_config->app_icon + "'; message='" +
+			                        ex.what( ) + "'" );
+		}
 	} else {
 		wxLogMessage( "%s", "Error: invalid app_icon path in config; path='" + m_app_config->app_icon + "'" );
 	}
@@ -743,19 +768,18 @@ void WebFrame::OnToolsClicked( wxCommandEvent &WXUNUSED( evt ) ) {
 	}
 	m_histMenuItems.clear( );
 
-	wxVector<wxSharedPtr<wxWebViewHistoryItem>> back = m_browser->GetBackwardHistory( );
-	wxVector<wxSharedPtr<wxWebViewHistoryItem>> forward = m_browser->GetForwardHistory( );
+	auto back = m_browser->GetBackwardHistory( );
+	auto forward = m_browser->GetForwardHistory( );
 
 	wxMenuItem *item;
 
-	unsigned int i;
-	for( i = 0; i < back.size( ); i++ ) {
+	for( unsigned int i = 0; i < back.size( ); i++ ) {
 		item = m_tools_history_menu->AppendRadioItem( wxID_ANY, back[i]->GetTitle( ) );
 		m_histMenuItems[item->GetId( )] = back[i];
 		Connect( item->GetId( ), wxEVT_MENU, wxCommandEventHandler( WebFrame::OnHistory ), nullptr, this );
 	}
 
-	wxString title = m_browser->GetCurrentTitle( );
+	auto title = m_browser->GetCurrentTitle( );
 	if( title.empty( ) ) {
 		title = "(untitled)";
 	}
@@ -767,13 +791,13 @@ void WebFrame::OnToolsClicked( wxCommandEvent &WXUNUSED( evt ) ) {
 	m_histMenuItems[item->GetId( )] = wxSharedPtr<wxWebViewHistoryItem>{
 	    new wxWebViewHistoryItem{m_browser->GetCurrentURL( ), m_browser->GetCurrentTitle( )}};
 
-	for( i = 0; i < forward.size( ); i++ ) {
+	for( unsigned int i = 0; i < forward.size( ); i++ ) {
 		item = m_tools_history_menu->AppendRadioItem( wxID_ANY, forward[i]->GetTitle( ) );
 		m_histMenuItems[item->GetId( )] = forward[i];
 		Connect( item->GetId( ), wxEVT_TOOL, wxCommandEventHandler( WebFrame::OnHistory ), nullptr, this );
 	}
 
-	wxPoint position = ScreenToClient( wxGetMousePosition( ) );
+	auto position = ScreenToClient( wxGetMousePosition( ) );
 	PopupMenu( m_tools_menu.get( ), position.x, position.y );
 }
 

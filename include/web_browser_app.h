@@ -28,31 +28,12 @@
 #error "A wxWebView backend is required by this sample"
 #endif
 
-#include <wx/artprov.h>
-#include <wx/cmdline.h>
-#include <wx/filesys.h>
-#include <wx/fs_arc.h>
-#include <wx/fs_mem.h>
 #include <wx/infobar.h>
-#include <wx/notifmsg.h>
-#include <wx/settings.h>
 #include <wx/stc/stc.h>
 #include <wx/webview.h>
 #include <wx/webviewarchivehandler.h>
-#include <wx/webviewfshandler.h>
 
 #include <memory>
-#include <regex>
-#include <stdexcept>
-#include <string>
-#include <vector>
-
-#if defined( __WXMSW__ ) || defined( __WXOSX__ )
-#include "../images/refresh.xpm"
-#include "../images/stop.xpm"
-#endif
-
-#include "../images/wxlogo.xpm"
 
 #include "config.h"
 
@@ -197,4 +178,3 @@ struct SourceViewDialog : wxDialog {
 	SourceViewDialog( SourceViewDialog && ) = default;
 	SourceViewDialog &operator=( SourceViewDialog && ) = default;
 }; // SourceViewDialog
-
