@@ -20,6 +20,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <regex>
+#include <string>
+
 #include "config.h"
 
 config_t::~config_t( ) {}
@@ -28,7 +31,17 @@ bool config_t::is_valid_url( boost::string_view url ) const {
 	if( url_validators.empty( ) ) {
 		return true;
 	}
-	return true;
+	for( auto const & url_validator: url_validators ) {
+		if( url_validator.is_regex ) {
+			std::regex r{ url_validator.url };
+			if( std::regex_match( url.to_string( ), r ) ) {
+				return true;
+			}
+		} else {
+			return url_validator.url == url;
+		}
+	}
+	return false;
 }
 
 url_validation_t::url_validation_t( ) : daw::json::JsonLink<url_validation_t>{}, is_regex{false}, url{""} {
@@ -41,7 +54,7 @@ url_validation_t::url_validation_t( url_validation_t const &other )
 	link_json( );
 }
 
-url_validation_t::url_validation_t( url_validation_t &&other ) noexcept
+url_validation_t::url_validation_t( url_validation_t &&other )
     : daw::json::JsonLink<url_validation_t>{}, is_regex{std::move( other.is_regex )}, url{std::move( other.url )} {
 
 	link_json( );
@@ -54,7 +67,7 @@ url_validation_t &url_validation_t::operator=( url_validation_t const &rhs ) {
 	return *this;
 }
 
-url_validation_t &url_validation_t::operator=( url_validation_t &&rhs ) noexcept {
+url_validation_t &url_validation_t::operator=( url_validation_t &&rhs ) {
 	using std::swap;
 	url_validation_t tmp{std::move( rhs )};
 	swap( *this, tmp );
@@ -86,7 +99,8 @@ config_t::config_t( )
     , enable_toolbar{true}
     , enable_view_source{true}
     , enable_view_text{true}
-    , enable_zoom{true} {
+    , enable_zoom{true}
+    , url_validators{} {
 
 	link_json( );
 }
@@ -109,12 +123,13 @@ config_t::config_t( config_t const &other )
     , enable_toolbar{other.enable_toolbar}
     , enable_view_source{other.enable_view_source}
     , enable_view_text{other.enable_view_text}
-    , enable_zoom{other.enable_zoom} {
+    , enable_zoom{other.enable_zoom}
+    , url_validators{other.url_validators} {
 
 	link_json( );
 }
 
-config_t::config_t( config_t &&other ) noexcept
+config_t::config_t( config_t &&other )
     : daw::json::JsonLink<config_t>{}
     , app_icon{std::move( other.app_icon )}
     , app_title{std::move( other.app_title )}
@@ -132,7 +147,8 @@ config_t::config_t( config_t &&other ) noexcept
     , enable_toolbar{std::move( other.enable_toolbar )}
     , enable_view_source{std::move( other.enable_view_source )}
     , enable_view_text{std::move( other.enable_view_text )}
-    , enable_zoom{std::move( other.enable_zoom )} {
+    , enable_zoom{std::move( other.enable_zoom )}
+    , url_validators{std::move( other.url_validators )} {
 
 	link_json( );
 }
@@ -156,10 +172,11 @@ config_t &config_t::operator=( config_t const &rhs ) {
 	enable_view_source = rhs.enable_view_source;
 	enable_view_text = rhs.enable_view_text;
 	enable_zoom = rhs.enable_zoom;
+	url_validators = rhs.url_validators;
 	return *this;
 }
 
-config_t &config_t::operator=( config_t &&rhs ) noexcept {
+config_t &config_t::operator=( config_t &&rhs ) {
 	app_icon = std::move( rhs.app_icon );
 	app_title = std::move( rhs.app_title );
 	home_url = std::move( rhs.home_url );
@@ -178,6 +195,7 @@ config_t &config_t::operator=( config_t &&rhs ) noexcept {
 	enable_view_source = std::move( rhs.enable_view_source );
 	enable_view_text = std::move( rhs.enable_view_text );
 	enable_zoom = std::move( rhs.enable_zoom );
+	url_validators = std::move( rhs.url_validators );
 	return *this;
 }
 
@@ -199,10 +217,11 @@ void config_t::link_json( ) {
 	this->link_boolean( "enable_view_source", enable_view_source );
 	this->link_boolean( "enable_view_text", enable_view_text );
 	this->link_boolean( "enable_zoom", enable_zoom );
+	this->link_array( "url_validators", url_validators );
 }
 
 char const *config_denied_exception::config_param_t::to_string( type t ) noexcept {
-	static char const *const result[] = {
+	static constexpr char const *const result[] = {
 	    "Access denied, enable_clipboard feature is not enabled",
 	    "Access denied, enable_command_line feature is not enabled.",
 	    "Access denied, enable_debug_window feature is not enabled.",

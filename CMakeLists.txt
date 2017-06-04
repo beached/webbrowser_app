@@ -6,11 +6,12 @@ include( ExternalProject )
 
 find_package( Boost 1.60.0 COMPONENTS system filesystem regex iostreams unit_test_framework REQUIRED ) 
 
-find_package( wxWidgets COMPONENTS webview stc adv core base net gl std aui html media xrc dbgrid qa richtext ribbon propgrid scintilla REQUIRED )
 
 if( ${CMAKE_CXX_COMPILER_ID} STREQUAL 'MSVC' )
+	find_package( wxWidgets COMPONENTS webview stc adv core base net gl std aui html media xrc qa richtext ribbon propgrid scintilla REQUIRED )
 	add_compile_options( -D_WIN32_WINNT=0x0601 /std:c++latest ) 
 else( )
+	find_package( wxWidgets COMPONENTS webview stc adv core base net gl std aui html media xrc qa richtext ribbon propgrid REQUIRED )
 	if( ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang" )
 		add_compile_options(-std=c++14 -Weverything -pthread -Wno-c++98-compat -g -Wno-covered-switch-default -Wno-padded -Wno-exit-time-destructors -Wno-c++98-compat-pedantic -Wno-unused-parameter -Wno-missing-noreturn -Wno-missing-prototypes -Wno-disabled-macro-expansion)
 	elseif( ${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" )

@@ -434,7 +434,8 @@ void WebFrame::OnIdle( wxIdleEvent &WXUNUSED( evt ) ) {
 }
 
 void WebFrame::OnUrl( wxCommandEvent &WXUNUSED( evt ) ) {
-	if( !m_app_config->is_valid_url( m_url->GetValue( ).mb_str( wxConvUTF8 ).data( ) ) ) {
+	auto const url = m_url->GetValue( ).ToStdString( );
+	if( !m_app_config->is_valid_url( url ) ) {
 		return;
 	}
 	m_browser->LoadURL( m_url->GetValue( ) );
@@ -635,6 +636,10 @@ void WebFrame::OnNavigationRequest( wxWebViewEvent &evt ) {
 		}
 		return;
 	}
+	auto const url = m_url->GetValue( ).ToStdString( );
+	if( !m_app_config->is_valid_url( url ) ) {
+		return;
+	}
 	if( m_info->IsShown( ) ) {
 		m_info->Dismiss( );
 	}
@@ -791,11 +796,17 @@ void WebFrame::OnToolsClicked( wxCommandEvent &WXUNUSED( evt ) ) {
 	m_histMenuItems[item->GetId( )] = wxSharedPtr<wxWebViewHistoryItem>{
 	    new wxWebViewHistoryItem{m_browser->GetCurrentURL( ), m_browser->GetCurrentTitle( )}};
 
-	for( unsigned int i = 0; i < forward.size( ); i++ ) {
+	for( auto const & fw: forward ) {
+		item = m_tools_history_menu->AppendRadioItem( wxID_ANY, fw->GetTitle( ) );
+		m_histMenuItems[item->GetId( )] = fw;
+		Connect( item->GetId( ), wxEVT_TOOL, wxCommandEventHandler( WebFrame::OnHistory ), nullptr, this );
+	}
+/*	for( unsigned int i = 0; i < forward.size( ); i++ ) {
 		item = m_tools_history_menu->AppendRadioItem( wxID_ANY, forward[i]->GetTitle( ) );
 		m_histMenuItems[item->GetId( )] = forward[i];
 		Connect( item->GetId( ), wxEVT_TOOL, wxCommandEventHandler( WebFrame::OnHistory ), nullptr, this );
 	}
+*/
 
 	auto position = ScreenToClient( wxGetMousePosition( ) );
 	PopupMenu( m_tools_menu.get( ), position.x, position.y );

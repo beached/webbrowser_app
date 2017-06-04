@@ -1,5 +1,5 @@
 /* XPM */
-static const char * wxlogo_xpm[] = {
+static constexpr char const * const wxlogo_xpm[] = {
 "24 24 57 1",
 " 	c None",
 ".	c #000006",
